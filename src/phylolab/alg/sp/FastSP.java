@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +19,7 @@ public class FastSP {
 	
 	long sharedHomologies = 0;
 	long totalHomologies = 0;
-	
+	private PrintStream out = System.out;
  
 	private long twoChoose (long n) {
 		if (n<2) {return 0;}
@@ -141,9 +142,15 @@ public class FastSP {
 			}
 		}	
 		long cells = (j+refColCount)*n;
-		System.err.println("k= " + k1 + ", n= " + n + 
-				", K1= " + refColCount + ", K2= " + j + 
-				", cells= " + cells);
+		System.err.println("MaxLenNoGap= " + k1 + ", NumSeq= " + n + 
+				", LenRef= " + refColCount + ", LenEst= " + j + 
+				", Cells= " + cells);
+		
+		if (k1 <= 0 || n<2 || refColCount <=0 || j <= 0 || cells <=0) {
+			System.err.println("Error: something wrong with alignments. Checkout out the statistics above.");
+			System.exit(1);
+		}
+		//TODO: perform some sanity checks to make sure the alignments are on same data
 	}
 	
 	private void computeSPFN (){
@@ -223,9 +230,17 @@ public class FastSP {
 			if (args[i].equals("-e")) {
 				estimated = args[i+1];
 			}
+			if (args[i].equals("-o")) {
+				try {
+					out = new PrintStream(args[i+1]);
+				} catch (FileNotFoundException e) {
+					out = null;
+					System.err.println(e.getLocalizedMessage());
+				}
+			}
 		}
-		if (estimated == null || reference == null) {
-			System.err.println("Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file");
+		if (estimated == null || reference == null || out == null) {
+			System.err.println("Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file [-o output_file]");
 			System.exit(1);
 		}
 		
@@ -234,7 +249,8 @@ public class FastSP {
 		System.err.println("Number of shared homologies: " + sharedHomologies);
 		System.err.println("Number of homologies in the reference alignment: " + 
 				totalHomologies);
-		System.out.println("SPFN: " + getSPFN());
+		out.println("SPFN " + getSPFN());
+		out.flush();
 	}
 	
 	public static void main (String [] args) {		
