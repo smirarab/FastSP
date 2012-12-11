@@ -1,4 +1,9 @@
 package phylolab.alg.sp;
+
+/* 
+ * This is FastSP version 1.2, developed by Siavash Mirarab and Tandy Warnow.
+*/
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -8,19 +13,37 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 public class FastSP {
 	
-	ReferenceAlignment referenceAlign;
-	int [][] s;	
-	int k1 = 0, k2 = 0, n = 0, refColCount = 0;
+	ReferenceAlignment referenceAlignment;
+	int [][] s;		
+	int k1 = 0, n = 0, refColCount = 0, estColCount;
+	
 	
 	long sharedHomologies = 0;
 	long totalHomologies = 0;
+	long totalHomologiesInEsitmated = 0;
+	long correctColumns = 0;
+	long effectiveRefColumns = 0;
+	long effectiveEstColumns = 0;
+	
+	ArrayList<Integer> charsPerEstimatedColumn;
+	
 	private PrintStream out = System.out;
  
+	boolean swapped = false;
+	
+	Set<Integer> dashChars = new HashSet<Integer>();
+	{
+		dashChars.add((int)'-');
+		dashChars.add((int)'?');
+	}
+	
 	private long twoChoose (long n) {
 		if (n<2) {return 0;}
 		return n*(n-1)/2;
@@ -45,44 +68,44 @@ public class FastSP {
 		}		
 		return nameStringBuffer.toString();
 	}
+	
+	private int readFirstLine(InputStream in, StringBuffer stringBuffer, StringBuffer seqName)  throws IOException {
+		int ch = in.read();
+		int colCount = 0, j = 0;
+		//skip any headers
+		while (ch != '>') { in.read();}	
+		seqName.append(readSequenceName(in));
+		ch = 0;
+		while (ch != '>') 
+		{
+			ch = in.read();							
+			int CH = Character.toUpperCase(ch);
+			if (dashChars.contains(CH)) {
+				stringBuffer.append((char)ch);
+				colCount++;
+			} else if ((CH >= 'A' && CH <= 'Z')) {
+				stringBuffer.append((char)ch);
+				colCount++;
+				j++;
+			}
+			
+		}		
+		k1 = Math.max(k1, j);
+		return colCount;		
+	}
 
-	private void readReferenceAlignment(InputStream in) throws IOException {
+	private void readReferenceAlignment(InputStream in, char [] firstSequence) throws IOException {			
 		
-		referenceAlign = new ReferenceAlignment();
-		
-		int ch;
+		int ch = '>';
 		int i = 0, j = 0;
 		int nucInd = 0;	
-		char[] sequence;
-		
-		//Read the first sequence
-		{
-			StringBuffer stringBuffer = new StringBuffer(); 			
-			ch = in.read();
-			//skip any headers
-			while (ch != '>') { in.read();}
-			referenceAlign.setSequencePosition(readSequenceName(in), i);
-			stringBuffer = new StringBuffer();	
-			ch = 0;
-			while (ch != '>') 
-			{
-				ch = in.read();							
-				int CH = Character.toUpperCase(ch);
-				if (CH >= 'A' && CH <= 'Z') {
-					k1 ++;
-					stringBuffer.append((char)ch);
-				} else if (CH == '-'){
-					stringBuffer.append((char)ch);
-				} 
-			}	
-			refColCount = stringBuffer.length();
-			sequence = stringBuffer.toString().toCharArray();
-		}
-		// Read the rest of sequences, directly creating a char []		
+		char[] sequence = firstSequence;		
+
+		// Read the rest of sequences, creating a char []		
 		while (true) {
 			if (ch == '>') {
 				// Add previous sequence's char [] to the reference alignment 
-				referenceAlign.addSequence(sequence);
+				referenceAlignment.addSequence(sequence);
 				sequence = new char [refColCount];
 				// update maximum number of (non-gap) sites if necessary. 
 				k1 = Math.max(k1, nucInd);
@@ -90,19 +113,19 @@ public class FastSP {
 				i++;
 				nucInd = 0;
 				j = 0;
-				referenceAlign.setSequencePosition(readSequenceName(in), i);
+				referenceAlignment.setSequencePosition(readSequenceName(in), i);
 			}			
 			int CH = Character.toUpperCase(ch);
 
-			if ((CH >= 'A' && CH <= 'Z')) {				
+			if (dashChars.contains(CH)){
+				sequence[j]=(char)ch;
+				j++;
+			} else if ((CH >= 'A' && CH <= 'Z')) {				
 				sequence[j]=(char)ch;
 				j++;
 				nucInd ++;
-			} else if (CH == '-'){
-				sequence[j]=(char)ch;
-				j++;
 			} else if (CH == -1) {
-				referenceAlign.addSequence(sequence);	
+				referenceAlignment.addSequence(sequence);	
 				k1 = Math.max(k1, nucInd);
 				break;
 			}
@@ -111,9 +134,10 @@ public class FastSP {
 		n = i + 1;		
 	}
 
-	private void readSubjectAlignment (InputStream in) throws IOException {
+	private void readEstimatedAlignment (InputStream in) throws IOException {
 		
 		s = new int [n][k1];
+		charsPerEstimatedColumn = new ArrayList<Integer>(k1);
 		
 		int ch;
 		int i = -1, j = 0;
@@ -128,32 +152,47 @@ public class FastSP {
 				nucInd = 0;
 				j = 0;			
 				// Find the position of this sequence in reference alignment
-				sequencePositionInReference = referenceAlign.getSequencePosition(readSequenceName(in));
+				String name = readSequenceName(in);
+				sequencePositionInReference = referenceAlignment.getSequencePosition(name);
+			}
+			if (i==0){
+				charsPerEstimatedColumn.add(0);
 			}
 			int CH = Character.toUpperCase(ch);
-			if (CH >= 'A' && CH <= 'Z') {
+			if (dashChars.contains(CH)){
+				j++;
+			} else if (CH >= 'A' && CH <= 'Z') {
 				s[sequencePositionInReference][nucInd] = j;
+				// increase the number of characters in column j				
+				charsPerEstimatedColumn.set(j, charsPerEstimatedColumn.get(j)+1);
 				j++;	
 				nucInd ++;
-			} else if (CH == '-'){
-				j++;
 			} else if (CH == -1) {
 				break;
 			}
 		}	
-		long cells = (j+refColCount)*n;
+		long cells = (j+refColCount);
+		cells*=n;
+			
+		estColCount = j;
+		
 		System.err.println("MaxLenNoGap= " + k1 + ", NumSeq= " + n + 
-				", LenRef= " + refColCount + ", LenEst= " + j + 
+				", LenRef= " + (swapped? estColCount: refColCount) + 
+				", LenEst= " + (swapped? refColCount: estColCount) + 
 				", Cells= " + cells);
 		
 		if (k1 <= 0 || n<2 || refColCount <=0 || j <= 0 || cells <=0) {
-			System.err.println("Error: something wrong with alignments. Checkout out the statistics above.");
+			System.err.println("Error: something is wrong with alignments. Checkout out the statistics above.");
 			System.exit(1);
+		}
+		for (int x: charsPerEstimatedColumn) {
+			totalHomologiesInEsitmated += twoChoose(x);
+			if (x>1) effectiveEstColumns++;
 		}
 		//TODO: perform some sanity checks to make sure the alignments are on same data
 	}
 	
-	private void computeSPFN (){
+	private void computeSPFNAndTC (){
 		
 		// This array holds current j in N_{i,j} 
 		// (i.e. non-gap current index) for each row
@@ -165,16 +204,16 @@ public class FastSP {
 		// Visit each site in reference alignment
 		for (int c = 0; c < refColCount; c++) {		
 			estimatedSitesCount = new HashMap<Integer, Integer>();	
-			long refHomogiesCount = 0;
+			long refCharCount = 0;
 			// For each sequence, if current position is a nuclotide, 
 			// - find the associated position in the estimated alignment
 			// - increment the size of the equivalence class of the associated position
 			// - increment the total number of homologies in reference alignment
 			for (int i = 0; i < n; i++) {
-				char nucltide = referenceAlign.getNucltide(i , c);
-				if (nucltide == '-')
+				int nucltide = referenceAlignment.getNucltide(i , c);
+				if (dashChars.contains(nucltide))
 					continue;
-				refHomogiesCount++;
+				refCharCount++;
 				int y = s[i][refColInd[i]];
 				refColInd[i] = refColInd[i] + 1;
 				int subjectColumnsCount = 0;
@@ -187,42 +226,114 @@ public class FastSP {
 			for (int y: estimatedSitesCount.keySet()) {
 				sharedHomologies += twoChoose(estimatedSitesCount.get(y));
 			}
-			totalHomologies += twoChoose(refHomogiesCount);	
-			// Clert the hash map for the next round
+			totalHomologies += twoChoose(refCharCount);
+			// calculate correctly aligned sites. 
+			if (estimatedSitesCount.size() == 1 && refCharCount >= 2) {
+				Integer estColumn = estimatedSitesCount.keySet().iterator().next();
+				if (estimatedSitesCount.get(estColumn) == charsPerEstimatedColumn.get(estColumn)) {
+					correctColumns ++;
+				}
+			}
+			if (refCharCount >= 2) {
+				effectiveRefColumns ++;
+			}
+			// Clear the hash map for the next round
 			estimatedSitesCount.clear();
 		}		
 	}
+
+	public double getSPScore () {
+		return (sharedHomologies)/(.0+totalHomologies);
+	}
 	
 	public double getSPFN () {
-		return (totalHomologies - sharedHomologies)/(.0+totalHomologies);
+		return 1- getSPScore();
+	}
+
+	public double getSPFP () {
+		return 1- getModeler();
+	}
+	
+	public double getCompressionFactor () {
+		return swapped? 
+				refColCount/(estColCount+.0):
+				estColCount / (refColCount+.0);
+	}
+	
+	public double getModeler () {
+		return (sharedHomologies)/(.0+totalHomologiesInEsitmated);
+	}	
+	
+	public double getTC () {
+		return (correctColumns+0.)/(effectiveRefColumns+0.0);
 	}
 	
 	public void run(String reference, String subject) {
 		try {
 			File referenceFile = new File(reference);
-			System.err.println("reading reference alignment " + referenceFile.getAbsolutePath() + " ...");
-			InputStream refIn = new BufferedInputStream(new FileInputStream(referenceFile));
-			readReferenceAlignment(refIn);			
+			System.err.println("Reference alignment: " + referenceFile.getAbsolutePath() + " ...");
+			InputStream refIn = new BufferedInputStream(new FileInputStream(referenceFile));						
+			
+			File estimatedFile = new File(subject);			
+			InputStream subIn = new BufferedInputStream(new FileInputStream(estimatedFile));
+			System.err.println("Estimated alignment: " + estimatedFile.getAbsolutePath() + " ...");
+			
+			StringBuffer refSeq1Name = new StringBuffer();
+			StringBuffer refSeq1 = new StringBuffer();
+			int firstLineReference = readFirstLine(refIn, refSeq1 , refSeq1Name);
+						
+			StringBuffer estSeq1Name = new StringBuffer();
+			StringBuffer estSeq1  = new StringBuffer();
+			int firstLineEstimated = readFirstLine(subIn, estSeq1 , estSeq1Name);
+			
+			if (firstLineEstimated < firstLineReference) {
+				swapped = true;
+				InputStream temp = subIn;
+				subIn = refIn;
+				refIn = temp;
+				refSeq1Name = estSeq1Name;
+				refSeq1 = estSeq1;
+				refColCount = firstLineEstimated;
+			} else {
+				refColCount = firstLineReference;
+			}
+			
+			
+			referenceAlignment = new ReferenceAlignment();
+			referenceAlignment.setSequencePosition(refSeq1Name.toString(), 0);
+			
+			readReferenceAlignment(refIn,refSeq1.toString().toCharArray());			
 			refIn.close();
 						
-			File subjectFile = new File(subject);
-			System.err.println("reading subject alignment " + subjectFile.getAbsolutePath() + " ...");
-			InputStream subIn = new BufferedInputStream(new FileInputStream(subjectFile));
-			readSubjectAlignment(subIn);
+			subIn.close();			
+			subIn = swapped ? new BufferedInputStream(new FileInputStream(referenceFile)):
+				new BufferedInputStream(new FileInputStream(estimatedFile));
+			try{
+				
+				readEstimatedAlignment(subIn);
+			}
+			catch (ArrayIndexOutOfBoundsException e) {
+				System.err.println("Problem reading estimated alignment. Sequence lengths don't match?");
+				subIn.close();
+				throw e;
+			}
+			
 			subIn.close();
 						
-			System.err.println("computing SPFN ...");
-			computeSPFN();		
+			System.err.println("computing ...");
+			computeSPFNAndTC();		
 									
 		} catch (FileNotFoundException e) {
 			System.err.println(e.getLocalizedMessage());
 		} catch (IOException e) {
 			System.err.println(e.getLocalizedMessage());
-		}
+		} 
+		
 	}
 	
 	protected void runWithArguments(String[] args) {
-		String estimated = null, reference = null;		
+		String estimated = null, reference = null;
+		boolean help = false;
 		for (int i=0; i<args.length; i++) {
 			if (args[i].equals("-r")) {
 				reference = args[i+1];
@@ -238,18 +349,57 @@ public class FastSP {
 					System.err.println(e.getLocalizedMessage());
 				}
 			}
-		}
-		if (estimated == null || reference == null || out == null) {
-			System.err.println("Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file [-o output_file]");
+			if (args[i].equals("-c")) {
+				char[] v = args[i+1].toCharArray();
+				for (int j = 0; j < v.length; j++) {
+					dashChars.add((int)v[j]);
+				}	
+				System.err.println("Following characters are considered a dash: "+dashChars);
+			}
+			if (args[i].equals("-h")) {
+				help = true;
+			}
+		}		
+		
+		if (estimated == null || reference == null || out == null || help) {
+			System.err.println("Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file [-o output_file] [-c GAP_CHARS]");
+			System.err.println("Output: \n" +
+								"	SP-Score:\t number of shared homologies (aligned pairs) / total number of homologies in the reference alignment. \n" +
+								"	Modeler: \t number of shared homologies (aligned pairs) / total number of homologies in the estimated alignment. \n" +
+								"	SP-FN:   \t 1 - SP-Score\n" +								
+								"	SP-FP:   \t 1 - Modeler\n" +
+								"	Compression:   \t number of columns in the estimated alignment / number of columns in the reference alignment \n" +
+								"	TC:      \t number of correctly aligned columns / total number of aligned columns in the reference alignment. \n");
 			System.exit(1);
 		}
 		
 		run(reference, estimated);
 		
+		if (swapped) {
+			long tmp = totalHomologies;
+			totalHomologies = totalHomologiesInEsitmated;
+			totalHomologiesInEsitmated = tmp;
+			
+			tmp = effectiveRefColumns;
+			effectiveRefColumns = effectiveEstColumns;
+			effectiveEstColumns = tmp;
+		}
+		
 		System.err.println("Number of shared homologies: " + sharedHomologies);
 		System.err.println("Number of homologies in the reference alignment: " + 
 				totalHomologies);
+		System.err.println("Number of homologies in the estimated alignment: " + 
+				totalHomologiesInEsitmated);		
+		System.err.println("Number of correctly aligned columns: " + 
+				correctColumns);
+		System.err.println("Number of aligned columns in ref. alignment: " + 
+				effectiveRefColumns);		
+		out.println("SP-Score " + getSPScore());		
+		out.println("Modeler " + getModeler());
 		out.println("SPFN " + getSPFN());
+		out.println("SPFP " + getSPFP());
+		out.println("Compression " + getCompressionFactor());
+		out.println("TC " + getTC());
 		out.flush();
 	}
 	
@@ -272,14 +422,18 @@ public class FastSP {
 		void addSequence(char[] s) {
 			sequencesOfRefAlign.add(s);
 		}
-		char getNucltide(int i, int c) {
+		int getNucltide(int i, int c) {
 			return sequencesOfRefAlign.get(i)[c];
 		} 
 		void setSequencePosition(String name, Integer position){
 			sequencePositions.put(name, position);
 		}
 		int getSequencePosition(String name){
-			return sequencePositions.get(name);
+			if (sequencePositions.containsKey(name)) {
+				return sequencePositions.get(name);
+			} else {
+				throw new RuntimeException("Sequence name Not Found: "+name);
+			}
 		}
 	}	
 }
