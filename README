@@ -4,7 +4,6 @@ FastSP is a Java program for computing alignment error (SP-FN) quickly and using
 
 Download: http://www.cs.utexas.edu/~phylo/software/fastsp/
 
-
 FAQ
 =================================================
 1. Is FastSP sensetive to case? Should I expect different results if I change the alignments from upper case to lower case or vice versa? 
@@ -42,5 +41,5 @@ Publication
 =================================================
 FastSP: Linear time calculation of alignment accuracy 
 by Siavash Mirarab and Tandy Warnow
-Bioinformatics 2011; doi: 10.1093/bioinformatics/btr553
+Bioinformatics 2011; doi: 10.1093/bioinformatics/btr553 (http://bioinformatics.oxfordjournals.org/content/27/23/3250.abstract)
 
