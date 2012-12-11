@@ -1,0 +1,4 @@
+Version 1.1:
+- Compression Factor added
+- SPFP Added
+- There was a bug in reporting k (maximum number of non-gap characters per sequence), which is fixed now.  
