@@ -1,3 +1,11 @@
+Version 1.3:
+- A small overflow issue in outputting number of cells is fixed
+
+Version 1.2:
+- ? is now treated the same way - is
+- Extra dash characters (such as N and X) can be defined with the -c option
+- Slightly improved error reporting
+
 Version 1.1:
 - Compression Factor added
 - SPFP Added
