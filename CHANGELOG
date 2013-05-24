@@ -1,3 +1,7 @@
+Version 1.4:
+- An important bug that occasionally caused incorrect TC values is fixed. 
+- version number is printed out
+
 Version 1.3:
 - A small overflow issue in outputting number of cells is fixed
 

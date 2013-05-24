@@ -1,7 +1,7 @@
 package phylolab.alg.sp;
 
 /* 
- * This is FastSP version 1.2, developed by Siavash Mirarab and Tandy Warnow.
+ * This is FastS, developed by Siavash Mirarab and Tandy Warnow.
 */
 
 import java.io.BufferedInputStream;
@@ -19,6 +19,8 @@ import java.util.Set;
 
 
 public class FastSP {
+	
+	public static String VERSION = "1.4"; 
 	
 	ReferenceAlignment referenceAlignment;
 	int [][] s;		
@@ -227,10 +229,12 @@ public class FastSP {
 				sharedHomologies += twoChoose(estimatedSitesCount.get(y));
 			}
 			totalHomologies += twoChoose(refCharCount);
-			// calculate correctly aligned sites. 
-			if (estimatedSitesCount.size() == 1 && refCharCount >= 2) {
+			// calculate correctly aligned sites.
+			
+			if (estimatedSitesCount.size() == 1 && refCharCount >= 2) {				
 				Integer estColumn = estimatedSitesCount.keySet().iterator().next();
-				if (estimatedSitesCount.get(estColumn) == charsPerEstimatedColumn.get(estColumn)) {
+				if (estimatedSitesCount.get(estColumn).equals(charsPerEstimatedColumn.get(estColumn))) {
+					//System.out.println(estimatedSitesCount.size());
 					correctColumns ++;
 				}
 			}
@@ -362,7 +366,8 @@ public class FastSP {
 		}		
 		
 		if (estimated == null || reference == null || out == null || help) {
-			System.err.println("Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file [-o output_file] [-c GAP_CHARS]");
+			System.err.println("FastSp version " + this.VERSION+ " develped by Siavash Mirarab and Tandy Warnow at UT at Austin\n\n" +
+					"Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file [-o output_file] [-c GAP_CHARS]");
 			System.err.println("Output: \n" +
 								"	SP-Score:\t number of shared homologies (aligned pairs) / total number of homologies in the reference alignment. \n" +
 								"	Modeler: \t number of shared homologies (aligned pairs) / total number of homologies in the estimated alignment. \n" +
