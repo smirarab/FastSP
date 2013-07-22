@@ -20,7 +20,7 @@ import java.util.Set;
 
 public class FastSP {
 	
-	public static String VERSION = "1.4"; 
+	public static String VERSION = "1.5"; 
 	
 	ReferenceAlignment referenceAlignment;
 	int [][] s;		
@@ -45,6 +45,8 @@ public class FastSP {
 		dashChars.add((int)'-');
 		dashChars.add((int)'?');
 	}
+	
+	boolean maskLower = false;
 	
 	private long twoChoose (long n) {
 		if (n<2) {return 0;}
@@ -71,7 +73,7 @@ public class FastSP {
 		return nameStringBuffer.toString();
 	}
 	
-	private int readFirstLine(InputStream in, StringBuffer stringBuffer, StringBuffer seqName)  throws IOException {
+	private int readFirstLine(InputStream in, StringBuffer stringBuffer, StringBuffer seqName, boolean toUpper)  throws IOException {
 		int ch = in.read();
 		int colCount = 0, j = 0;
 		//skip any headers
@@ -81,11 +83,11 @@ public class FastSP {
 		while (ch != '>') 
 		{
 			ch = in.read();							
-			int CH = Character.toUpperCase(ch);
+			int CH = toUpper? Character.toUpperCase(ch): ch;
 			if (dashChars.contains(CH)) {
 				stringBuffer.append((char)ch);
 				colCount++;
-			} else if ((CH >= 'A' && CH <= 'Z')) {
+			} else if ((CH >= 'A' && CH <= 'Z') || (CH >= 'z' && CH <= 'z')) {
 				stringBuffer.append((char)ch);
 				colCount++;
 				j++;
@@ -160,7 +162,7 @@ public class FastSP {
 			if (i==0){
 				charsPerEstimatedColumn.add(0);
 			}
-			int CH = Character.toUpperCase(ch);
+			int CH = maskLower? ch: Character.toUpperCase(ch);		
 			if (dashChars.contains(CH)){
 				j++;
 			} else if (CH >= 'A' && CH <= 'Z') {
@@ -169,6 +171,10 @@ public class FastSP {
 				charsPerEstimatedColumn.set(j, charsPerEstimatedColumn.get(j)+1);
 				j++;	
 				nucInd ++;
+			} else if (CH >= 'a' && CH <= 'z') {
+			    	s[sequencePositionInReference][nucInd] = -1; 
+			    	j++;
+			    	nucInd ++;
 			} else if (CH == -1) {
 				break;
 			}
@@ -217,12 +223,13 @@ public class FastSP {
 					continue;
 				refCharCount++;
 				int y = s[i][refColInd[i]];
+				if (y != -1) { // This is the case where the residue was left in 
+				    	       // an unaligned column in the estimated alignment
+				    int subjectColumnsCount = estimatedSitesCount.containsKey(y) ? 
+					    estimatedSitesCount.get(y): 0;
+				    estimatedSitesCount.put(y, subjectColumnsCount + 1);
+				} 
 				refColInd[i] = refColInd[i] + 1;
-				int subjectColumnsCount = 0;
-				if (estimatedSitesCount.containsKey(y)) {					
-					subjectColumnsCount = estimatedSitesCount.get(y); 
-				}
-				estimatedSitesCount.put(y, subjectColumnsCount + 1);
 			}
 			// Update the number of shared and total homologies.
 			for (int y: estimatedSitesCount.keySet()) {
@@ -231,7 +238,7 @@ public class FastSP {
 			totalHomologies += twoChoose(refCharCount);
 			// calculate correctly aligned sites.
 			
-			if (estimatedSitesCount.size() == 1 && refCharCount >= 2) {				
+			if (estimatedSitesCount.size() == 1 && refCharCount >= 2 && estimatedSitesCount.values().iterator().next() == refCharCount) {				
 				Integer estColumn = estimatedSitesCount.keySet().iterator().next();
 				if (estimatedSitesCount.get(estColumn).equals(charsPerEstimatedColumn.get(estColumn))) {
 					//System.out.println(estimatedSitesCount.size());
@@ -284,13 +291,13 @@ public class FastSP {
 			
 			StringBuffer refSeq1Name = new StringBuffer();
 			StringBuffer refSeq1 = new StringBuffer();
-			int firstLineReference = readFirstLine(refIn, refSeq1 , refSeq1Name);
+			int firstLineReference = readFirstLine(refIn, refSeq1 , refSeq1Name, true);
 						
 			StringBuffer estSeq1Name = new StringBuffer();
 			StringBuffer estSeq1  = new StringBuffer();
-			int firstLineEstimated = readFirstLine(subIn, estSeq1 , estSeq1Name);
+			int firstLineEstimated = readFirstLine(subIn, estSeq1 , estSeq1Name, !maskLower);
 			
-			if (firstLineEstimated < firstLineReference) {
+			if ((firstLineEstimated < firstLineReference) && !maskLower) {
 				swapped = true;
 				InputStream temp = subIn;
 				subIn = refIn;
@@ -301,8 +308,7 @@ public class FastSP {
 			} else {
 				refColCount = firstLineReference;
 			}
-			
-			
+						
 			referenceAlignment = new ReferenceAlignment();
 			referenceAlignment.setSequencePosition(refSeq1Name.toString(), 0);
 			
@@ -341,13 +347,16 @@ public class FastSP {
 		for (int i=0; i<args.length; i++) {
 			if (args[i].equals("-r")) {
 				reference = args[i+1];
+				i++;
 			}
 			if (args[i].equals("-e")) {
 				estimated = args[i+1];
+				i++;
 			}
 			if (args[i].equals("-o")) {
 				try {
 					out = new PrintStream(args[i+1]);
+					i++;
 				} catch (FileNotFoundException e) {
 					out = null;
 					System.err.println(e.getLocalizedMessage());
@@ -355,10 +364,15 @@ public class FastSP {
 			}
 			if (args[i].equals("-c")) {
 				char[] v = args[i+1].toCharArray();
+				i++;
 				for (int j = 0; j < v.length; j++) {
 					dashChars.add((int)v[j]);
 				}	
 				System.err.println("Following characters are considered a dash: "+dashChars);
+			}
+			if (args[i].equals("-ml")) {
+				maskLower = true;	
+				System.err.println("Lower case characters in estimated alignment would not be considered homologs to other characters in the same column.");
 			}
 			if (args[i].equals("-h")) {
 				help = true;
@@ -366,8 +380,8 @@ public class FastSP {
 		}		
 		
 		if (estimated == null || reference == null || out == null || help) {
-			System.err.println("FastSp version " + this.VERSION+ " develped by Siavash Mirarab and Tandy Warnow at UT at Austin\n\n" +
-					"Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file [-o output_file] [-c GAP_CHARS]");
+			System.err.println("FastSp version " + this.VERSION+ " develped by Siavash Mirarab (smirarab@cs.utexas.edu) and Tandy Warnow at UT-Austin\n\n" +
+					"Usage: FastSP -r reference_alignment_file -e estimated_alignmet_file [-o output_file] [-c GAP_CHARS] [-ml mask out lower case characters in estimated]");
 			System.err.println("Output: \n" +
 								"	SP-Score:\t number of shared homologies (aligned pairs) / total number of homologies in the reference alignment. \n" +
 								"	Modeler: \t number of shared homologies (aligned pairs) / total number of homologies in the estimated alignment. \n" +

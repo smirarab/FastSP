@@ -1,3 +1,6 @@
+Version 1.5:
+- A feature added where by specifying -ml FastSP can be instructed to ignore lower case letters as not being homologous. 
+
 Version 1.4:
 - An important bug that occasionally caused incorrect TC values is fixed. 
 - version number is printed out
