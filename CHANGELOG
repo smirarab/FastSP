@@ -1,3 +1,6 @@
+Version 1.6:
+- Added -mlr to enable removing of lower case letters from reference. 
+
 Version 1.5:
 - A feature added where by specifying -ml FastSP can be instructed to ignore lower case letters as not being homologous. 
 
