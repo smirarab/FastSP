@@ -2,6 +2,16 @@ Overview
 ====
 FastSP is a Java program for computing alignment error (SP-FN) quickly and using little memory. It compared two alignments, and computes a bunch of metrics (see below).
 
+Older versions are available [here](http://www.cs.utexas.edu/~phylo/software/fastsp/older) and a change log is available [here](CHANGELOG). 
+Dataset
+
+Some test datasets are available [here](http://www.cs.utexas.edu/~phylo/software/fastsp/datasets.zip).
+
+Usage
+===
+
+```java -jar FastSP.jar -r reference_alignment_file -e estimated_alignment_file```
+
 
 FAQ
 ===
