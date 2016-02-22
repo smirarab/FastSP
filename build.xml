@@ -3,7 +3,7 @@
     <!--this file was created by Eclipse Runnable JAR Export Wizard-->
     <!--ANT 1.7 is required                                        -->
     <target name="create_run_jar">
-        <jar destfile="spfn.jar">
+        <jar destfile="FastSP.jar">
             <manifest>
                 <attribute name="Main-Class" value="phylolab.alg.sp.FastSP"/>
                 <attribute name="Rsrc-Main-Class" value="phylolab.alg.sp.FastSP"/>
@@ -13,6 +13,6 @@
             <fileset dir="bin"/>
             <fileset dir="src"/>        	
         </jar>
-    	<chmod perm="+x" file="spfn.jar"></chmod>    	
+    	<chmod perm="+x" file="FastSP.jar"></chmod>    	
     </target>
 </project>
