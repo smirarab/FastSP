@@ -17,9 +17,10 @@ FAQ
 ===
 1. Is FastSP sensitive to case? Should I expect different results if I change the alignments from upper case to lower case or vice versa? 
 
-    **A:** By default No. FastSP is by default not sensitive to case. In fact, it is not even sensitive to what characters you have in the alignment (and it doesn't need to). FastSP just cares about whether a certain position in the alignment is a residue or a gap. So, lower case letters are considered aligned as well as upper case case letters. Note that qscore is sensitive to case. qscore treats lower case letters as not aligned.
+    **Answer:** 
+    * By default No. FastSP is by default not sensitive to case. In fact, it is not even sensitive to what characters you have in the alignment (and it doesn't need to). FastSP just cares about whether a certain position in the alignment is a residue or a gap. So, lower case letters are considered aligned as well as upper case case letters. Note that qscore is sensitive to case. qscore treats lower case letters as not aligned.
 
-    You can add a -ml option to make FastSP sensitive to case. -ml instructs FastSP that it should ignore any homologies in the estimated alignment where one of both of the characters are lower case. 
+    * You can add a `-ml` option to make FastSP sensitive to case. `-ml` instructs FastSP that it should ignore any homologies in the estimated alignment where one of both of the characters are lower case. Similarly, `-mlr` instructs FastSP that it should ignore any homologies in the reference alignment.
 
 2. What do I do if I get a `OutOFMemoryException`? 
 
