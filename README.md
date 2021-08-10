@@ -38,7 +38,8 @@ FAQ
 	* SP-FN: 1 - SP-Score
 	* SP-FP: 1- Modeler
 	* TC: number of correctly aligned columns / total number of aligned columns.
-	* Compression Factor: number of columns in the estimated alignment / number of columns in the reference alignment
+	* Compression Factor (naive): number of columns in the estimated alignment / number of columns in the reference alignment
+	* Compression Factor: Similar to the naive version, with one difference: when `-ml` and/or `-mlr` are given, insertions (e.g., lower letters) are considered to be their own column in this version.  
 	
 	But FastSP also outputs (in standard error):
 	* MaxLenNoGap: maximum number of non-gap characters
