@@ -1,3 +1,6 @@
+Version 1.7:
+- Changed how compression factor is computed when -ml or -mlr are given; consider insertion sites as singletons. 
+
 Version 1.6:
 - Added -mlr to enable removing of lower case letters from reference. 
 

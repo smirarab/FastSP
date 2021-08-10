@@ -19,7 +19,7 @@ import java.util.Set;
 
 public class FastSP {
 
-	public static String VERSION = "1.6.0";
+	public static String VERSION = "1.7.0";
 
 	ReferenceAlignment referenceAlignment;
 	int[][] s;
@@ -31,6 +31,12 @@ public class FastSP {
 	long correctColumns = 0;
 	long effectiveRefColumns = 0;
 	long effectiveEstColumns = 0;
+
+	long RefColumnsSing = 0;
+	long EstColumnsSing = 0;
+
+	long RefInsertTotal = 0;
+	long EstInsertTotal = 0;
 
 	ArrayList<Integer> charsPerEstimatedColumn;
 
@@ -74,7 +80,7 @@ public class FastSP {
 	}
 
 	private int readFirstLine(InputStream in, StringBuffer stringBuffer,
-			StringBuffer seqName, boolean toUpper) throws IOException {
+			StringBuffer seqName, boolean toUpper, boolean ref) throws IOException {
 		int ch = in.read();
 		int colCount = 0, j = 0;
 		// skip any headers
@@ -86,6 +92,8 @@ public class FastSP {
 		while (ch != '>') {
 			ch = in.read();
 			int CH = toUpper ? Character.toUpperCase(ch) : ch;
+			if (ref && (CH >= 'a' && CH <= 'z'))
+				RefInsertTotal++;
 			if (dashChars.contains(CH)) {
 				stringBuffer.append((char) ch);
 				colCount++;
@@ -122,8 +130,12 @@ public class FastSP {
 				j = 0;
 				referenceAlignment.setSequencePosition(readSequenceName(in), i);
 			}
+			
 			int CH = maskLowerReference ? ch : Character.toUpperCase(ch);
 
+			if (CH >= 'a' && CH <= 'z')
+				RefInsertTotal++;
+			
 			if (dashChars.contains(CH)) {
 				sequence[j] = (char) ch;
 				j++;
@@ -168,6 +180,8 @@ public class FastSP {
 					charsPerEstimatedColumn.add(0);
 				}
 				int CH = maskLower ? ch : Character.toUpperCase(ch);
+				if (CH >= 'a' && CH <= 'z')
+					EstInsertTotal++;
 				if (dashChars.contains(CH)) {
 					j++;
 				} else if (CH >= 'A' && CH <= 'Z') {
@@ -208,7 +222,9 @@ public class FastSP {
 		}
 		for (int x : charsPerEstimatedColumn) {
 			totalHomologiesInEsitmated += twoChoose(x);
-			if (x > 1)
+			if (x == 1) 
+				EstColumnsSing++;
+			else if (x > 1)
 				effectiveEstColumns++;
 		}
 		// TODO: perform some sanity checks to make sure the alignments are on
@@ -265,9 +281,12 @@ public class FastSP {
 					correctColumns++;
 				}
 			}
-			if (refCharCount >= 2) {
+			if (refCharCount == 1) {
+				RefColumnsSing++;
+			} else if (refCharCount >= 2) {
 				effectiveRefColumns++;
 			}
+
 			// Clear the hash map for the next round
 			estimatedSitesCount.clear();
 		}
@@ -315,12 +334,12 @@ public class FastSP {
 			StringBuffer refSeq1Name = new StringBuffer();
 			StringBuffer refSeq1 = new StringBuffer();
 			int firstLineReference = readFirstLine(refIn, refSeq1, refSeq1Name,
-					!maskLowerReference);
+					!maskLowerReference, true);
 
 			StringBuffer estSeq1Name = new StringBuffer();
 			StringBuffer estSeq1 = new StringBuffer();
 			int firstLineEstimated = readFirstLine(subIn, estSeq1, estSeq1Name,
-					!maskLower);
+					!maskLower, false);
 
 			if ((firstLineEstimated < firstLineReference) && !maskLower &&!maskLowerReference) {
 				swapped = true;
@@ -422,7 +441,8 @@ public class FastSP {
 							+ "	Modeler: \t number of shared homologies (aligned pairs) / total number of homologies in the estimated alignment. \n"
 							+ "	SP-FN:   \t 1 - SP-Score\n"
 							+ "	SP-FP:   \t 1 - Modeler\n"
-							+ "	Compression:   \t number of columns in the estimated alignment / number of columns in the reference alignment \n"
+							+ "	Compression (naive):   \t number of columns in the estimated alignment / number of columns in the reference alignment \n"
+							+ "	Compression: \t number of columns (counting insertions as singletons) in the estimated alignment / number of columns (counting insertions as singletons) in the reference alignment \n"
 							+ "	TC:      \t number of correctly aligned columns / total number of aligned columns in the reference alignment. \n");
 			System.exit(1);
 		}
@@ -437,6 +457,14 @@ public class FastSP {
 			tmp = effectiveRefColumns;
 			effectiveRefColumns = effectiveEstColumns;
 			effectiveEstColumns = tmp;
+
+			tmp = RefColumnsSing;
+			RefColumnsSing = EstColumnsSing;
+			EstColumnsSing = tmp;
+			
+			tmp = RefInsertTotal;
+			RefInsertTotal = EstInsertTotal;
+			EstInsertTotal = tmp; 
 		}
 
 		System.err.println("Number of shared homologies: " + sharedHomologies);
@@ -448,11 +476,22 @@ public class FastSP {
 				+ correctColumns);
 		System.err.println("Number of aligned columns in ref. alignment: "
 				+ effectiveRefColumns);
+		if (maskLowerReference)
+			System.err.println("Number of singleton and (uncollapsed) insertion columns in ref. alignment: "
+				+ RefColumnsSing+ " "+ RefInsertTotal);
+		System.err.println("Number of aligned columns in est. alignment: "
+				+ effectiveEstColumns);
+		if (maskLower)
+			System.err.println("Number of singleton and (uncollapsed) insertion columns in est. alignment: "
+				+ EstColumnsSing + " " + EstInsertTotal);
 		out.println("SP-Score " + getSPScore());
 		out.println("Modeler " + getModeler());
 		out.println("SPFN " + getSPFN());
 		out.println("SPFP " + getSPFP());
-		out.println("Compression " + getCompressionFactor());
+		if (maskLowerReference || maskLower)
+			out.println("Compression (naive) " + getCompressionFactor());
+		out.println("Compression " + (effectiveEstColumns +
+				EstInsertTotal+ EstColumnsSing) / (effectiveRefColumns + RefInsertTotal + RefColumnsSing + .0) );
 		out.println("TC " + getTC());
 		out.flush();
 	}
