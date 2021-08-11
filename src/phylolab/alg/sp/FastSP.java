@@ -19,7 +19,7 @@ import java.util.Set;
 
 public class FastSP {
 
-	public static String VERSION = "1.7.0";
+	public static String VERSION = "1.7.1";
 
 	ReferenceAlignment referenceAlignment;
 	int[][] s;
@@ -29,14 +29,19 @@ public class FastSP {
 	long totalHomologies = 0;
 	long totalHomologiesInEsitmated = 0;
 	long correctColumns = 0;
+	
 	long effectiveRefColumns = 0;
 	long effectiveEstColumns = 0;
 
-	long RefColumnsSing = 0;
-	long EstColumnsSing = 0;
+	long singletonRefColumns = 0;
+	long singletonEstColumns = 0;
 
-	long RefInsertTotal = 0;
-	long EstInsertTotal = 0;
+	//long allGapsRefColumns = 0;
+	//long allGapsEstColumns = 0;
+	
+	long insertRefTotal = 0;
+	long insertEstTotal = 0;
+
 
 	ArrayList<Integer> charsPerEstimatedColumn;
 
@@ -93,7 +98,7 @@ public class FastSP {
 			ch = in.read();
 			int CH = toUpper ? Character.toUpperCase(ch) : ch;
 			if (ref && (CH >= 'a' && CH <= 'z'))
-				RefInsertTotal++;
+				insertRefTotal++;
 			if (dashChars.contains(CH)) {
 				stringBuffer.append((char) ch);
 				colCount++;
@@ -134,7 +139,7 @@ public class FastSP {
 			int CH = maskLowerReference ? ch : Character.toUpperCase(ch);
 
 			if (CH >= 'a' && CH <= 'z')
-				RefInsertTotal++;
+				insertRefTotal++;
 			
 			if (dashChars.contains(CH)) {
 				sequence[j] = (char) ch;
@@ -175,13 +180,15 @@ public class FastSP {
 					name = readSequenceName(in);
 					sequencePositionInReference = referenceAlignment
 							.getSequencePosition(name);
+					continue;
 				}
 				if (i == 0) {
-					charsPerEstimatedColumn.add(0);
+					if (ch != '\n' && ch != '\r')
+						charsPerEstimatedColumn.add(0);
 				}
 				int CH = maskLower ? ch : Character.toUpperCase(ch);
 				if (CH >= 'a' && CH <= 'z')
-					EstInsertTotal++;
+					insertEstTotal++;
 				if (dashChars.contains(CH)) {
 					j++;
 				} else if (CH >= 'A' && CH <= 'Z') {
@@ -197,10 +204,11 @@ public class FastSP {
 					nucInd++;
 				} else if (CH == -1) {
 					break;
-				}
+				} 
 			} catch (ArrayIndexOutOfBoundsException e) {
 				System.err
-						.println("Problem reading estimated alignment. Sequence lengths don't match? : "
+						.println("Problem reading estimated alignment. "
+								+ "Sequence lengths don't match? : "
 								+ name);
 				throw e;
 			}
@@ -217,13 +225,18 @@ public class FastSP {
 
 		if (k1 <= 0 || n < 2 || refColCount <= 0 || j <= 0 || cells <= 0) {
 			System.err
-					.println("Error: something is wrong with alignments. Checkout out the statistics above.");
+					.println("Error: something is wrong with alignments. "
+							+ "Checkout out the statistics above.");
 			System.exit(1);
 		}
+		//System.out.println(charsPerEstimatedColumn);
 		for (int x : charsPerEstimatedColumn) {
 			totalHomologiesInEsitmated += twoChoose(x);
+			//if (x == 0)
+			//	allGapsEstColumns++;
+			//else 
 			if (x == 1) 
-				EstColumnsSing++;
+				singletonEstColumns++;
 			else if (x > 1)
 				effectiveEstColumns++;
 		}
@@ -242,6 +255,7 @@ public class FastSP {
 		HashMap<Integer, Integer> estimatedSitesCount;
 		// Visit each site in reference alignment
 		for (int c = 0; c < refColCount; c++) {
+			//boolean insertionSite = false;
 			estimatedSitesCount = new HashMap<Integer, Integer>();
 			long refCharCount = 0;
 			// For each sequence, if current position is a nuclotide,
@@ -253,7 +267,7 @@ public class FastSP {
 				if (dashChars.contains(nucltide))
 					continue;
 				if (maskLowerReference && nucltide >= 'a' && nucltide <= 'z') {
-					
+					//insertionSite = true;
 				} else {
 					refCharCount++;
 					int y = s[i][refColInd[i]];
@@ -281,8 +295,11 @@ public class FastSP {
 					correctColumns++;
 				}
 			}
+			//if (!insertionSite && refCharCount == 0) {
+			//	allGapsRefColumns++;
+			//} else 
 			if (refCharCount == 1) {
-				RefColumnsSing++;
+				singletonRefColumns++;
 			} else if (refCharCount >= 2) {
 				effectiveRefColumns++;
 			}
@@ -458,13 +475,17 @@ public class FastSP {
 			effectiveRefColumns = effectiveEstColumns;
 			effectiveEstColumns = tmp;
 
-			tmp = RefColumnsSing;
-			RefColumnsSing = EstColumnsSing;
-			EstColumnsSing = tmp;
+			tmp = singletonRefColumns;
+			singletonRefColumns = singletonEstColumns;
+			singletonEstColumns = tmp;
 			
-			tmp = RefInsertTotal;
-			RefInsertTotal = EstInsertTotal;
-			EstInsertTotal = tmp; 
+			//tmp = allGapsRefColumns;
+			//allGapsRefColumns = allGapsEstColumns;
+			//allGapsEstColumns = tmp; 
+			
+			tmp = insertRefTotal;
+			insertRefTotal = insertEstTotal;
+			insertEstTotal = tmp; 
 		}
 
 		System.err.println("Number of shared homologies: " + sharedHomologies);
@@ -476,22 +497,28 @@ public class FastSP {
 				+ correctColumns);
 		System.err.println("Number of aligned columns in ref. alignment: "
 				+ effectiveRefColumns);
-		if (maskLowerReference)
+		if (maskLowerReference || singletonRefColumns!= 0)
 			System.err.println("Number of singleton and (uncollapsed) insertion columns in ref. alignment: "
-				+ RefColumnsSing+ " "+ RefInsertTotal);
+				+ singletonRefColumns+ " "+ insertRefTotal);
 		System.err.println("Number of aligned columns in est. alignment: "
 				+ effectiveEstColumns);
-		if (maskLower)
+		if (maskLower || singletonEstColumns!=0)
 			System.err.println("Number of singleton and (uncollapsed) insertion columns in est. alignment: "
-				+ EstColumnsSing + " " + EstInsertTotal);
+				+ singletonEstColumns + " " + insertEstTotal);
+		/*nif ( allGapsRefColumns != 0 )
+			System.err.println("WARNING: " + allGapsRefColumns + 
+					" all gaps columns were found in the reference alignment");
+		if ( allGapsEstColumns != 0 )
+			System.err.println("WARNING: " + allGapsEstColumns + 
+					" all gaps columns were found in the estimated alignment");*/
 		out.println("SP-Score " + getSPScore());
 		out.println("Modeler " + getModeler());
 		out.println("SPFN " + getSPFN());
 		out.println("SPFP " + getSPFP());
-		if (maskLowerReference || maskLower)
-			out.println("Compression (naive) " + getCompressionFactor());
-		out.println("Compression " + (effectiveEstColumns +
-				EstInsertTotal+ EstColumnsSing) / (effectiveRefColumns + RefInsertTotal + RefColumnsSing + .0) );
+		out.println("Compression (naive) " + getCompressionFactor());
+		out.println("Compression " + 
+				(effectiveEstColumns + insertEstTotal + singletonEstColumns) / 
+				(effectiveRefColumns + insertRefTotal + singletonRefColumns + .0) );
 		out.println("TC " + getTC());
 		out.flush();
 	}
